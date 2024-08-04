@@ -83,9 +83,11 @@ class BaseModel(ABC):
         """
         if self.isTrain:
             self.schedulers = [networks.get_scheduler(optimizer, opt) for optimizer in self.optimizers]
+
         if not self.isTrain or opt.continue_train:
             load_suffix = 'iter_%d' % opt.load_iter if opt.load_iter > 0 else opt.epoch
             self.load_networks(load_suffix)
+
         self.print_networks(opt.verbose)
 
     def eval(self):
@@ -131,6 +133,7 @@ class BaseModel(ABC):
         for name in self.visual_names:
             if isinstance(name, str):
                 visual_ret[name] = getattr(self, name)
+
         return visual_ret
 
     def get_current_losses(self):
@@ -179,7 +182,10 @@ class BaseModel(ABC):
         Parameters:
             epoch (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
         """
-        for name in self.model_names:
+        list_names = self.model_names
+        if self.opt.pretrained_network:
+            list_names = ['G']
+        for name in list_names:
             if isinstance(name, str):
                 load_filename = '%s_net_%s.pth' % (epoch, name)
                 load_path = os.path.join(self.save_dir, load_filename)

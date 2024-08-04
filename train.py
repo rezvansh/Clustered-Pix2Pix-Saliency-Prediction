@@ -23,23 +23,45 @@ from options.train_options import TrainOptions
 from data import create_dataset
 from models import create_model
 from util.visualizer import Visualizer
+import copy
+import torch
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
     dataset_size = len(dataset)    # get the number of images in the dataset.
     print('The number of training images = %d' % dataset_size)
+    opt_val = copy.deepcopy(opt)
+    opt_val.phase = 'val'
+    dataset_val = create_dataset(opt_val)  # create a dataset given opt.dataset_mode and other options
+    dataset_val_size = len(dataset_val)
+    visualizer_val = Visualizer(opt_val)
 
     model = create_model(opt)      # create a model given opt.model and other options
     model.setup(opt)               # regular setup: load and print networks; create schedulers
     visualizer = Visualizer(opt)   # create a visualizer that display/save images and plots
     total_iters = 0                # the total number of training iterations
+    total_iters_val = 0
+    #counting all types of parameters
+    pytorch_trainable_total_params_G = sum(p.numel() for p in model.netG.parameters() if p.requires_grad)
+    pytorch_trainable_total_params_D = sum(p.numel() for p in model.netD.parameters() if p.requires_grad)
+    pytorch_trainable_total_params = pytorch_trainable_total_params_G + pytorch_trainable_total_params_D
+    print("Number of Generator trainable parameters: ", pytorch_trainable_total_params_G)
+    print("Number of Discriminator trainable parameters: ", pytorch_trainable_total_params_D)
+    print("Number of Total trainable parameters: ", pytorch_trainable_total_params)
+    pytorch_total_params_D = sum(p.numel() for p in model.netD.parameters())
+    pytorch_total_params_G = sum(p.numel() for p in model.netG.parameters())
+    pytorch_total_params = pytorch_total_params_G + pytorch_total_params_D
+    print("Number of total Generator parameters: ", pytorch_total_params_G)
+    print("Number of total Discriminator parameters: ", pytorch_total_params_D)
+    print("Number of total parameters: ", pytorch_total_params)
 
     for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):    # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
         epoch_start_time = time.time()  # timer for entire epoch
         iter_data_time = time.time()    # timer for data loading per iteration
         epoch_iter = 0                  # the number of training iterations in current epoch, reset to 0 every epoch
         visualizer.reset()              # reset the visualizer: make sure it saves the results to HTML at least once every epoch
+        visualizer_val.reset()
         model.update_learning_rate()    # update learning rates in the beginning of every epoch.
         for i, data in enumerate(dataset):  # inner loop within one epoch
             iter_start_time = time.time()  # timer for computation per iteration
@@ -59,7 +81,7 @@ if __name__ == '__main__':
             if total_iters % opt.print_freq == 0:    # print training losses and save logging information to the disk
                 losses = model.get_current_losses()
                 t_comp = (time.time() - iter_start_time) / opt.batch_size
-                visualizer.print_current_losses(epoch, epoch_iter, losses, t_comp, t_data)
+                visualizer.print_current_losses(epoch, epoch_iter, losses, t_comp, t_data, total_iters)
                 if opt.display_id > 0:
                     visualizer.plot_current_losses(epoch, float(epoch_iter) / dataset_size, losses)
 
@@ -73,5 +95,23 @@ if __name__ == '__main__':
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
             model.save_networks('latest')
             model.save_networks(epoch)
+
+        epoch_iter_val = 0
+        for i, data_val in enumerate(dataset_val):
+            iter_val_start_time = time.time()
+            if total_iters_val % opt_val.print_freq == 0:
+                t_data_val = iter_val_start_time - iter_data_time
+
+            total_iters_val += opt_val.batch_size
+            epoch_iter_val += opt_val.batch_size
+
+            model.set_input(data_val)  # unpack data from data loader
+            model.test()  # run inference
+            with torch.no_grad():
+                model.loss_cal_validation()
+            if total_iters_val % opt_val.print_freq == 0:    # print training losses and save logging information to the disk
+                losses_val = model.get_current_losses()
+                t_comp = (time.time() - iter_val_start_time) / opt_val.batch_size
+                visualizer_val.print_current_losses(epoch, epoch_iter_val, losses_val, t_comp, t_data_val, total_iters_val)
 
         print('End of epoch %d / %d \t Time Taken: %d sec' % (epoch, opt.n_epochs + opt.n_epochs_decay, time.time() - epoch_start_time))

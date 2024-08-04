@@ -33,14 +33,17 @@ def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256, use_w
     image_dir = webpage.get_image_dir()
     short_path = ntpath.basename(image_path[0])
     name = os.path.splitext(short_path)[0]
-
+    cluster_num = image_path[0].split("/")[-3]
     webpage.add_header(name)
     ims, txts, links = [], [], []
     ims_dict = {}
     for label, im_data in visuals.items():
         im = util.tensor2im(im_data)
-        image_name = '%s_%s.png' % (name, label)
-        save_path = os.path.join(image_dir, image_name)
+        image_name = '%s.png' % (name)
+        save_path = os.path.join(image_dir, cluster_num, image_name)
+
+        if not os.path.exists(os.path.join(image_dir, cluster_num)):
+            os.makedirs(os.path.join(image_dir, cluster_num))
         util.save_image(im, save_path, aspect_ratio=aspect_ratio)
         ims.append(image_name)
         txts.append(label)
@@ -79,7 +82,7 @@ class Visualizer():
         self.wandb_project_name = opt.wandb_project_name
         self.current_epoch = 0
         self.ncols = opt.display_ncols
-
+        self.phase = opt.phase
         if self.display_id > 0:  # connect to a visdom server given <display_port> and <display_server>
             import visdom
             self.vis = visdom.Visdom(server=opt.display_server, port=opt.display_port, env=opt.display_env)
@@ -96,7 +99,7 @@ class Visualizer():
             print('create web directory %s...' % self.web_dir)
             util.mkdirs([self.web_dir, self.img_dir])
         # create a logging file to store training losses
-        self.log_name = os.path.join(opt.checkpoints_dir, opt.name, 'loss_log.txt')
+        self.log_name = os.path.join(opt.checkpoints_dir, opt.name, f'loss_log_{opt.phase}.txt')
         with open(self.log_name, "a") as log_file:
             now = time.strftime("%c")
             log_file.write('================ Training Loss (%s) ================\n' % now)
@@ -238,7 +241,7 @@ class Visualizer():
             self.wandb_run.log(losses)
 
     # losses: same format as |losses| of plot_current_losses
-    def print_current_losses(self, epoch, iters, losses, t_comp, t_data):
+    def print_current_losses(self, epoch, iters, losses, t_comp, t_data, total_iters):
         """print current losses on console; also save the losses to the disk
 
         Parameters:
@@ -248,7 +251,7 @@ class Visualizer():
             t_comp (float) -- computational time per data point (normalized by batch_size)
             t_data (float) -- data loading time per data point (normalized by batch_size)
         """
-        message = '(epoch: %d, iters: %d, time: %.3f, data: %.3f) ' % (epoch, iters, t_comp, t_data)
+        message = '(epoch: %d, iters: %d, time: %.3f, data: %.3f, total_iters: %d) ' % (epoch, iters, t_comp, t_data, total_iters)
         for k, v in losses.items():
             message += '%s: %.3f ' % (k, v)
 
