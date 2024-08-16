@@ -1,6 +1,6 @@
 # Clustered Saliency Prediction
 ### <a href="https://proceedings.bmvc2023.org/499/">[Paper]</a> 
-This is an implementation of the model in paper <a href="https://proceedings.bmvc2023.org/499/">Clustered Saliency Prediction</a> by R. Sherkati and J. Clark.
+This is an implementation of the model in paper <a href="https://proceedings.bmvc2023.org/499/">Clustered Saliency Prediction</a> by R. Sherkati and J. Clark (British Machine Vision Conference 2023).
 Here we have used the code in <a href="https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/tree/master">this repository</a> as the base and added our contributions and methods to it. We have done our experiments on the Personalized Saliency Maps dataset collected <a href="https://github.com/xuyanyu-shh/Personalized-Saliency"> here </a>. 
 
 # Clustering the viewers
